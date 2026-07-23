@@ -828,7 +828,7 @@ export class WhatsAppBot {
     const karyawanCommands = ['.karyawanmenu', 'karyawanmenu', '.addproduk', 'addproduk', '.delproduk', 'delproduk', '.listproduk', 'listproduk', '.cekproduk', 'cekproduk', '.addstok', 'addstok', '.cekstok', 'cekstok', '.updatestok', 'updatestok', '.restock', 'restock', '.penjualan', 'penjualan', '.riwayatjual', 'riwayatjual', '.laporan', 'laporan', '.konfirmasi', 'konfirmasi', '.hargaproduk', 'hargaproduk', '.strukpembayaran', 'strukpembayaran'];
     const hewanCommands = ['.hewanmenu', 'hewanmenu', '.catcanvas', 'catcanvas', '.dogcanvas', 'dogcanvas', '.foxcanvas', 'foxcanvas', '.wolfcanvas', 'wolfcanvas', '.lioncanvas', 'lioncanvas', '.tigercanvas', 'tigercanvas', '.pandacanvas', 'pandacanvas', '.bunnycanvas', 'bunnycanvas', '.owlcanvas', 'owlcanvas', '.eaglecanvas', 'eaglecanvas', '.capycanvas', 'capycanvas', '.penguincanvas', 'penguincanvas'];
     const bokepCommands = ['.bokepmenu', 'bokepmenu', '.vidbokepindonesia', 'vidbokepindonesia', '.vidbokepmalaysia', 'vidbokepmalaysia', '.vidbokepjepang', 'vidbokepjepang', '.vidbokepchina', 'vidbokepchina', '.vidbokepamerika', 'vidbokepamerika'];
-    const aiCommands = ['.aimenu', 'aimenu', '.gpt4', 'gpt4', '.gemini', 'gemini', '.deepseek', 'deepseek', '.ai', 'ai', '.bing', 'bing', '.imgai', 'imgai', '.askai', 'askai', '.bingimg', 'bingimg'];
+    const aiCommands = ['.aimenu', 'aimenu', '.gpt4', 'gpt4', '.gemini', 'gemini', '.deepseek', 'deepseek', '.ai', 'ai', '.bing', 'bing', '.imgai', 'imgai', '.askai', 'askai', '.bingimg', 'bingimg', '.nanobananaai', 'nanobananaai', '.hapusbgfoto', 'hapusbgfoto'];
     
     if (ownerCommands.includes(requestedCmd) && !isOwner) {
       this.broadcastState(`Blocked non-owner from using ${requestedCmd}`);
@@ -2796,7 +2796,9 @@ Ketik menu yang kamu inginkan.`;
 │ .bing <teks>
 │ .imgai <prompt>
 │ .askai <teks>
-│ .bingimg <prompt>`;
+│ .bingimg <prompt>
+│ .nanobananaai <prompt>
+│ .hapusbgfoto <reply/kirim foto>`;
       await this.sock.sendMessage(jid, { text: aiText }, { quoted: msg });
       this.broadcastState(`Responded to aimenu command`);
     } else if (body === "bokepmenu" || body === ".bokepmenu" || body === "bokep menu" || body === ".bokep menu") {
@@ -2830,6 +2832,7 @@ Ketik menu yang kamu inginkan.`;
         if (cmd === "gemini") systemPrompt = "You are Gemini, a powerful AI model created by Google.";
         if (cmd === "deepseek") systemPrompt = "You are DeepSeek, an AI model created by DeepSeek AI.";
         if (cmd === "bing") systemPrompt = "You are Bing AI, an AI assistant created by Microsoft.";
+
         
         let answer = "";
         const genAiApiKey = process.env.GEMINI_API_KEY;
@@ -2894,8 +2897,48 @@ Ketik menu yang kamu inginkan.`;
          await this.sock.sendMessage(jid, { text: "❌ *Terjadi kesalahan sistem saat memproses permintaan AI.*\n\nError: " + e.message }, { quoted: msg });
          await this.sock.sendMessage(jid, { react: { text: "❌", key: msg.key } });
       }
+    } else if (body.toLowerCase().startsWith(".hapusbgfoto") || body.toLowerCase().startsWith("hapusbgfoto")) {
+      const isQuotedImage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
+      const isImage = msg.message?.imageMessage;
+      
+      if (!isImage && !isQuotedImage) {
+         return await this.sock.sendMessage(jid, { text: "⚠️ Kirim gambar dengan caption .hapusbgfoto atau balas gambar dengan .hapusbgfoto" }, { quoted: msg });
+      }
+      
+      await this.sock.sendMessage(jid, { react: { text: "⏳", key: msg.key } });
+      
+      try {
+          const pseudoMsg = isQuotedImage ? msg.message?.extendedTextMessage?.contextInfo?.quotedMessage : msg.message;
+          const media = await downloadMediaMessage(
+            { message: pseudoMsg, key: msg.key } as any,
+            'buffer',
+            {},
+            { 
+              logger: this.sock.logger,
+              reuploadRequest: this.sock.updateMediaMessage
+            }
+          );
+          
+          if (!media) {
+             return await this.sock.sendMessage(jid, { text: "❌ *Gagal mengunduh gambar.*" }, { quoted: msg });
+          }
+
+          // Use the background removal node module
+          const { removeBackground } = require('@imgly/background-removal-node');
+          const blob = new Blob([media], { type: 'image/jpeg' });
+          const resultBlob = await removeBackground(blob);
+          const buffer = Buffer.from(await resultBlob.arrayBuffer());
+
+          await this.sock.sendMessage(jid, { image: buffer, caption: "🖼️ *Background berhasil dihapus!*" }, { quoted: msg });
+          await this.sock.sendMessage(jid, { react: { text: "✅", key: msg.key } });
+      } catch (e) {
+         console.error("hapusbgfoto err:", e);
+         await this.sock.sendMessage(jid, { text: "❌ *Gagal memproses gambar atau server sedang sibuk (sedang mengunduh model AI).* Coba lagi dalam 1 menit." }, { quoted: msg });
+         await this.sock.sendMessage(jid, { react: { text: "❌", key: msg.key } });
+      }
     } else if (body.startsWith(".imgai ") || body.startsWith("imgai ") ||
-               body.startsWith(".bingimg ") || body.startsWith("bingimg ")) {
+               body.startsWith(".bingimg ") || body.startsWith("bingimg ") ||
+               body.startsWith(".nanobananaai ") || body.startsWith("nanobananaai ")) {
                
       const args = body.split(" ");
       const cmd = args[0].replace(".", "").toLowerCase();
@@ -2908,7 +2951,10 @@ Ketik menu yang kamu inginkan.`;
       await this.sock.sendMessage(jid, { react: { text: "⏳", key: msg.key } });
       
       try {
-         const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(query)}?width=1024&height=1024&nologo=true`;
+         let imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(query)}?width=1024&height=1024&nologo=true`;
+         if (cmd === "nanobananaai") {
+            imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(query + " nanobanana style")}?width=1024&height=1024&nologo=true&model=flux`;
+         }
          await this.sock.sendMessage(jid, { image: { url: imageUrl }, caption: `🖼️ *Hasil image dari:* ${query}` }, { quoted: msg });
          await this.sock.sendMessage(jid, { react: { text: "✅", key: msg.key } });
       } catch (e) {
